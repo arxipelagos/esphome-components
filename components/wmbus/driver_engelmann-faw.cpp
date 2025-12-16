@@ -15,6 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <optional>   // ✅ FIX
 #include "meters_common_implementation.h"
 
 namespace
@@ -28,7 +29,7 @@ namespace
     {
         di.setName("engelmann-faw");
 
-        // ✅ Default-Felder: C1 liefert aktuelle Werte, kein Archiv erzwingen
+        // Default-Felder für C1
         di.setDefaultFields("name,id,status,consumption,timestamp");
 
         di.addLinkMode(LinkMode::T1);
@@ -87,10 +88,9 @@ namespace
             Quantity::Volume,
             [&](Telegram &t) -> std::optional<double>
             {
-                // Entschlüsselter Payload (ohne Link-/TPL-Header)
                 const auto &p = t.decryptedPayload();
 
-                // Python-Code nutzt data[33:37] → hier gleicher Offset
+                // Python-Code: data[33:37]
                 if (p.size() < 37)
                     return std::nullopt;
 
@@ -100,52 +100,14 @@ namespace
                     (static_cast<uint32_t>(p[35]) << 16) |
                     (static_cast<uint32_t>(p[36]) << 24);
 
-                // Skalierung: Liter → m³
                 return static_cast<double>(raw) / 1000.0;
             });
 
         /* =========================
          * ARCHIVWERTE (T1 / LANG)
-         * bleiben erhalten
          * ========================= */
         addStringFieldWithExtractor(
             "reporting_date",
             "The reporting date of the last billing period.",
             DEFAULT_PRINT_PROPERTIES,
-            FieldMatcher::build()
-                .set(MeasurementType::Instantaneous)
-                .set(VIFRange::Date)
-                .set(StorageNr(1)));
-
-        addNumericFieldWithExtractor(
-            "consumption_at_reporting_date",
-            "The water consumption at the last billing period date.",
-            DEFAULT_PRINT_PROPERTIES,
-            Quantity::Volume,
-            VifScaling::Auto,
-            DifSignedness::Signed,
-            FieldMatcher::build()
-                .set(MeasurementType::Instantaneous)
-                .set(VIFRange::Volume)
-                .set(StorageNr(1)));
-
-        for (int i = 2; i <= 16; ++i)
-        {
-            std::string name, info;
-            strprintf(&name, "consumption_%d_months_ago", i - 1);
-            strprintf(&info, "Water consumption %d month(s) ago.", i - 1);
-
-            addNumericFieldWithExtractor(
-                name,
-                info,
-                DEFAULT_PRINT_PROPERTIES,
-                Quantity::Volume,
-                VifScaling::Auto,
-                DifSignedness::Signed,
-                FieldMatcher::build()
-                    .set(MeasurementType::Instantaneous)
-                    .set(VIFRange::Volume)
-                    .set(StorageNr(i)));
-        }
-    }
-}
+            FieldMatcher::
