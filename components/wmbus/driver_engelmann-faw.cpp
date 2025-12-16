@@ -12,7 +12,7 @@ namespace
         di.setName("engelmann-faw");
 
         // ✅ Default-Felder für C1 (KEIN Erzwingen von Archivwerten)
-        di.setDefaultFields("name,id,status,consumption_m3,timestamp");
+        di.setDefaultFields("name,id,status,consumption,timestamp");
 
         // Unterstützte Link-Modes
         di.addLinkMode(LinkMode::T1);
