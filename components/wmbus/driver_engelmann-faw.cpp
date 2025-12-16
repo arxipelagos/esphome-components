@@ -1,21 +1,8 @@
 /*
  Copyright (C) 2020-2022 Fredrik Öhrström (gpl-3.0-or-later)
-
- This program is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <optional>   // ✅ FIX
+#include <optional>
 #include "meters_common_implementation.h"
 
 namespace
@@ -29,7 +16,7 @@ namespace
     {
         di.setName("engelmann-faw");
 
-        // Default-Felder für C1
+        // C1 liefert nur aktuellen Wert
         di.setDefaultFields("name,id,status,consumption,timestamp");
 
         di.addLinkMode(LinkMode::T1);
@@ -47,7 +34,7 @@ namespace
         : MeterCommonImplementation(mi, di)
     {
         /* =========================
-         * STATUS / ERROR FLAGS
+         * STATUS
          * ========================= */
         addStringFieldWithExtractorAndLookup(
             "status",
@@ -78,19 +65,20 @@ namespace
 
         /* =========================
          * AKTUELLER VERBRAUCH
-         * C1 – Kompakt-Telegramm
-         * AES Mode 5
+         * C1 KOMPAKT – AES MODE 5
          * ========================= */
         addNumericField(
             "consumption",
-            "Current water consumption (C1 compact telegram, AES mode 5).",
-            DEFAULT_PRINT_PROPERTIES,
             Quantity::Volume,
-            [&](Telegram &t) -> std::optional<double>
+            DEFAULT_PRINT_PROPERTIES,
+            "Current water consumption (C1 compact telegram, AES mode 5).",
+            Unit::CubicMeter,
+            [](Telegram &t) -> std::optional<double>
             {
-                const auto &p = t.decryptedPayload();
+                // In dieser Codebasis ist payload() bereits entschlüsselt
+                const auto &p = t.payload();
 
-                // Python-Code: data[33:37]
+                // Python: data[33:37]
                 if (p.size() < 37)
                     return std::nullopt;
 
@@ -100,14 +88,51 @@ namespace
                     (static_cast<uint32_t>(p[35]) << 16) |
                     (static_cast<uint32_t>(p[36]) << 24);
 
+                // Liter → m³
                 return static_cast<double>(raw) / 1000.0;
             });
 
         /* =========================
-         * ARCHIVWERTE (T1 / LANG)
+         * ARCHIVWERTE (T1)
          * ========================= */
         addStringFieldWithExtractor(
             "reporting_date",
             "The reporting date of the last billing period.",
             DEFAULT_PRINT_PROPERTIES,
-            FieldMatcher::
+            FieldMatcher::build()
+                .set(MeasurementType::Instantaneous)
+                .set(VIFRange::Date)
+                .set(StorageNr(1)));
+
+        addNumericFieldWithExtractor(
+            "consumption_at_reporting_date",
+            "The water consumption at the last billing period date.",
+            DEFAULT_PRINT_PROPERTIES,
+            Quantity::Volume,
+            VifScaling::Auto,
+            DifSignedness::Signed,
+            FieldMatcher::build()
+                .set(MeasurementType::Instantaneous)
+                .set(VIFRange::Volume)
+                .set(StorageNr(1)));
+
+        for (int i = 2; i <= 16; ++i)
+        {
+            std::string name, info;
+            strprintf(&name, "consumption_%d_months_ago", i - 1);
+            strprintf(&info, "Water consumption %d month(s) ago.", i - 1);
+
+            addNumericFieldWithExtractor(
+                name,
+                info,
+                DEFAULT_PRINT_PROPERTIES,
+                Quantity::Volume,
+                VifScaling::Auto,
+                DifSignedness::Signed,
+                FieldMatcher::build()
+                    .set(MeasurementType::Instantaneous)
+                    .set(VIFRange::Volume)
+                    .set(StorageNr(i)));
+        }
+    }
+}
