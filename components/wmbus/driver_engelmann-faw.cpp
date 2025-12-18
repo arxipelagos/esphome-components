@@ -158,14 +158,15 @@ namespace
         // TIMESTAMP (046D, DateTime, Instantaneous)
         // --------------------------------------------------------------
         addNumericFieldWithExtractor(
-            "timestamp",
-            "Meter timestamp (compact frame).",
-            DEFAULT_PRINT_PROPERTIES | PrintProperty::TIMESTAMP,
-            Quantity::Time,
-            VifScaling::None,
-            DifSignedness::Signed,
-            FieldMatcher::build()
-                .set(MeasurementType::Instantaneous)
-                .set(VIFRange::DateTime));
+             "timestamp",
+             "Meter timestamp (compact frame).",
+             DEFAULT_PRINT_PROPERTIES,
+             Quantity::Time,
+             VifScaling::None,
+             DifSignedness::Signed,
+             FieldMatcher::build()
+                 .set(MeasurementType::Instantaneous)
+                 .set(VIFRange::DateTime));
+
     }
 }
